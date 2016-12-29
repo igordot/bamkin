@@ -1,0 +1,316 @@
+#!/bin/bash
+
+
+# script info
+script_name=$(basename "${BASH_SOURCE[0]}")
+code_dir=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+
+# help function
+function HELP {
+	echo "" >&2
+	echo " Summary: " >&2
+	echo "" >&2
+	echo " Usage:" >&2
+	echo "   $script_name -g <genome.fasta> -b <variants.bed> -s <sample sheet> " >&2
+	echo " Options: " >&2
+	echo "   -t <threads> " >&2
+	echo "   -o <output dir> " >&2
+	echo "" >&2
+	exit 1
+}
+
+# check for correct number of arguments
+if [ $# -eq 0 ] ; then
+	HELP
+fi
+
+# initiate flag variables
+genome_fasta=""
+snps_bed=""
+sample_sheet=""
+threads=4
+out_dir="."
+
+# parse command line flags
+while getopts ":t:g:b:s:o:h" OPT; do
+	case $OPT in
+		"g")
+			genome_fasta=$OPTARG
+			;;
+		"b")
+			snps_bed=$OPTARG
+			;;
+		"s")
+			sample_sheet=$OPTARG
+			;;
+		"t")
+			threads=$OPTARG
+			;;
+		"o")
+			out_dir=$OPTARG
+			;;
+		"h")
+			HELP
+			;;
+		"?")
+			echo -e "\n invalid option: -$OPTARG \n" >&2
+			exit 1
+			;;
+		":")
+			echo -e "\n option -$OPTARG requires an argument \n" >&2
+			exit 1
+			;;
+		*)
+			echo -e "\n uknown error \n" >&2
+			exit 1
+			;;
+	esac
+done
+
+
+#########################
+
+
+# check if input files exist
+
+genome_fasta=$(readlink -f "$genome_fasta")
+if [ ! -s "$genome_fasta" ] || [ ! -n "$genome_fasta" ] ; then
+	echo -e "\n ERROR: FASTA $genome_fasta does not exist \n" >&2
+	exit 1
+fi
+
+snps_bed=$(readlink -f "$snps_bed")
+if [ ! -s "$snps_bed" ] || [ ! -n "$snps_bed" ] ; then
+	echo -e "\n ERROR: SNPs BED $snps_bed does not exist \n" >&2
+	exit 1
+fi
+
+sample_sheet=$(readlink -f "$sample_sheet")
+if [ ! -s "$sample_sheet" ] || [ ! -n "$sample_sheet" ] ; then
+	echo -e "\n ERROR: sample sheet $sample_sheet does not exist \n" >&2
+	exit 1
+fi
+
+
+#########################
+
+
+# check software
+
+# check if samtools is in path
+samtools_path=$(which samtools)
+if [ ! -x "$samtools_path" ] ; then
+	echo -e "\n ERROR: samtools is not in path \n" >&2
+	exit 1
+fi
+
+samtools --version
+echo
+
+# check if bcftools is in path
+bcftools_path=$(which bcftools)
+if [ ! -x "$bcftools_path" ] ; then
+	echo -e "\n ERROR: bcftools is not in path \n" >&2
+	exit 1
+fi
+
+bcftools --version
+echo
+
+# check if rscript is in path
+rscript_path=$(which Rscript)
+if [ ! -x "$rscript_path" ] ; then
+	echo -e "\n ERROR: Rscript is not in path \n" >&2
+	exit 1
+fi
+
+Rscript --version
+echo
+
+
+#########################
+
+
+# check if output already exists
+
+out_dir=$(readlink -f "$out_dir")
+
+merged_freq_csv="${out_dir}/snp.freq.csv"
+if [ -s "$merged_freq_csv" ] ; then
+	echo -e "\n ERROR: output $merged_freq_csv already exists \n" >&2
+	exit 1
+fi
+
+stats_csv="${out_dir}/snp.stats.csv"
+if [ -s "$stats_csv" ] ; then
+	echo -e "\n ERROR: output $stats_csv already exists \n" >&2
+	exit 1
+fi
+
+
+#########################
+
+
+# fix potential CSV problems
+
+# fix newlines
+dos2unix --quiet "$sample_sheet"
+mac2unix --quiet "$sample_sheet"
+# replace commas inside quoted fields with dashes
+awk -F '"' -v OFS='' '{ for (i=2; i<=NF; i+=2) gsub(",", "-", $i) } 1' "$sample_sheet" \
+> "${sample_sheet}.tmp" && mv "${sample_sheet}.tmp" "$sample_sheet"
+# replace quotes
+sed -i 's/\"//g' "$sample_sheet"
+# remove lines missing any values (only commas present)
+sed -i '/^,,*$/d' "$sample_sheet"
+# add newline to end of file if one does not exist (some scripts may complain)
+sed -i -e '$a\' "$sample_sheet"
+
+# print sample sheet
+echo
+column -t -s ',' "$sample_sheet"
+echo
+
+# check that sample names are unique
+num_samples=$(cut -d "," -f 1 "$sample_sheet" | wc -l)
+num_unique_samples=$(cut -d "," -f 1 "$sample_sheet" | LC_ALL=C sort | uniq | wc -l)
+if [ "$num_samples" -gt "$num_unique_samples" ] ; then
+	echo -e "\n ERROR: some sample names are repeated \n" >&2
+	exit 1
+fi
+
+sleep 5
+
+
+#########################
+
+
+# samtools/bcftools variant calling to get frequencies for each sample
+
+echo -e "\n ========== step 1: call variants ========== \n"
+
+# switch to the output directory (and not use path for outputs)
+mkdir -pv "$out_dir"
+cd "$out_dir" || exit
+
+# multi-threaded using xargs
+# xargs arguments:
+# $0 : $genome_fasta
+# $1 : $snps_bed
+# $2 : col1 from $sample_sheet
+# $3 : col2 from $sample_sheet
+
+cat "$sample_sheet" | tr ',' '\n' | xargs -n 2 -P "$threads" bash -c \
+'samtools mpileup \
+--uncompressed --max-depth 10000 --min-MQ 20 --ignore-RG --skip-indels \
+--fasta-ref "$0" --positions "$1" "$3" \
+| bcftools call --consensus-caller \
+> temp.${2}.vcf' "$genome_fasta" "$snps_bed"
+
+sleep 5
+
+
+#########################
+
+
+# process VCF for each sample
+
+echo -e "\n ========== step 2: filter variants ========== \n"
+
+# stats summary file header
+echo "#SAMPLE,covered_snps,present_snps" > "$stats_csv"
+
+# loop over samples in sample sheet
+for sample in $(cat "$sample_sheet" | cut -d "," -f 1) ; do
+
+	# filenames
+	vcf="temp.${sample}.vcf"
+	filtered_txt="temp.${sample}.filtered.txt"
+	freq_csv="temp.${sample}.freq.csv"
+
+	# filtered txt (VCF filtered by quality)
+	bcftools query \
+	--collapse all \
+	--include '%QUAL>30 && MQ>20 && DP>=5' \
+	--format '%CHROM:%POS\t%REF\t%FIRST_ALT\t%QUAL\t[%GT]\t%DP4\n' \
+	"$vcf" \
+	| LC_ALL=C sort -k1,1 \
+	> "$filtered_txt"
+
+	sleep 1
+
+	# SNP frequencies table
+	echo "#POS,${sample}" > "$freq_csv"
+	cut -f 1,6 "$filtered_txt" \
+	| tr '\t' ',' \
+	| awk -F ',' '{printf "%s,%.3f\n", $1, ($4+$5)/($2+$3+$4+$5)}' \
+	>> "$freq_csv"
+
+	sleep 1
+
+	# get number of SNPs
+	covered_snps=$(grep -v "^#" "$freq_csv" | wc -l)
+	present_snps=$(grep -v "^#" "$freq_csv" | awk -F ',' '$2 > 0.2' | wc -l)
+
+	# keep table of frequencies for samples with a sufficient number of covered SNPs
+	# cutoff should be relatively high to provide enough overlap across all samples
+	if [ "$present_snps" -lt 1000 ] ; then
+		rm -f "$freq_csv"
+		echo " skip $sample due to insufficient coverage "
+	fi
+
+	echo "${sample},${covered_snps},${present_snps}" >> "$stats_csv"
+
+	rm -f "$vcf"
+
+done
+
+sleep 5
+
+
+#########################
+
+
+# merge frequency tables of all samples
+
+echo -e "\n ========== step 3: merge variant frequencies ========== \n"
+
+# create initial row names
+cut -d ',' -f 1 $(find . -name "temp.*.freq.csv" | LC_ALL=C sort | head -1) > "$merged_freq_csv"
+
+# loop over frequency tables of individual samples
+for freq_csv in $(find . -name "temp.*.freq.csv" | LC_ALL=C sort) ; do
+
+	# join
+	LC_ALL=C join -t ',' "$merged_freq_csv" "$freq_csv" > "${merged_freq_csv}.tmp"
+	mv -f "${merged_freq_csv}.tmp" "$merged_freq_csv"
+
+	# print stats
+	sample=${freq_csv/%.freq.csv/}
+	sample=${sample/*temp./}
+	num_rows=$(cat $merged_freq_csv | wc -l)
+	num_cols=$(head -1 $merged_freq_csv | tr ',' '\n' | wc -l)
+	echo " merged table size: $num_rows x $num_cols after sample $sample "
+
+done
+
+sleep 5
+
+
+#########################
+
+
+# generate correlation plots in R
+
+echo -e "\n ========== step 4: summarize ========== \n"
+
+rscript_cmd="Rscript --vanilla ${code_dir}/summarize.R $merged_freq_csv"
+echo "$rscript_cmd"
+$rscript_cmd
+
+
+#########################
+
+
+
+# end

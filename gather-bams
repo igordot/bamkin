@@ -1,0 +1,59 @@
+#!/bin/bash
+
+
+# script info
+script_name=$(basename "${BASH_SOURCE[0]}")
+
+# help function
+function HELP {
+	echo "" >&2
+	echo " Summary: Generate sample sheet based on given BAM files directory. " >&2
+	echo "" >&2
+	echo " Usage: $script_name <directory containing BAM files> " >&2
+	echo "" >&2
+	exit 1
+}
+
+# check for correct number of arguments
+if [ ! $# == 1 ] ; then
+	HELP
+fi
+
+# arguments
+bam_dir=$1
+
+# check that input exists
+if [ ! -d "$bam_dir" ] ; then
+	echo -e "\n ERROR: dir $bam_dir does not exist \n" >&2
+	exit 1
+fi
+
+# search for BAMs in given dir
+file_list=""
+basename_list=""
+dirname_list=""
+for bam_file in $(find -L "$bam_dir" -type f -iname "*.bam" | LC_ALL=C sort) ; do
+	bam_file=$(readlink -f "$bam_file")
+	file_list="${file_list}\n${bam_file}"
+	# save a list of sample names based on both file and dir names
+	basename_list="${basename_list}\n$(basename ${bam_file} | sed 's/\.bam$//i')"
+	dirname_list="${dirname_list}\n$(basename $(dirname ${bam_file}))"
+done
+
+# check if file or dir names are more unique
+unique_basenames=$(echo -e "${basename_list}" | uniq | wc -l)
+unique_dirnames=$(echo -e "${dirname_list}" | uniq | wc -l)
+if [ $unique_dirnames -gt $unique_basenames ] ; then
+	# dirnames are more unique
+	sample_names="${dirname_list}"
+else
+	# filenames are more unique
+	sample_names="${basename_list}"
+fi
+
+# print sample and file list
+paste -d ',' <(echo -e "${sample_names}") <(echo -e "${file_list}") | grep -v "^,$"
+
+
+
+# end
