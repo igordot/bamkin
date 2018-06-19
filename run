@@ -11,10 +11,10 @@ function HELP {
 	echo " Summary: " >&2
 	echo "" >&2
 	echo " Usage:" >&2
-	echo "   $script_name -g <genome.fasta> -b <variants.bed> -s <sample sheet> " >&2
+	echo "   $script_name -g <genome.fasta> -b <variants.bed> -s <samples.csv> " >&2
 	echo " Options: " >&2
 	echo "   -t <threads> " >&2
-	echo "   -o <output dir> " >&2
+	echo "   -o <output_dir> " >&2
 	echo "" >&2
 	exit 1
 }
@@ -179,6 +179,16 @@ if [ "$num_samples" -gt "$num_unique_samples" ] ; then
 	exit 1
 fi
 
+# check that BAMs exist
+for bam in $(cat "$sample_sheet" | cut -d "," -f 2) ; do
+
+	if [ ! -s "$bam" ] ; then
+		echo -e "\n ERROR: file $bam does not exist \n" >&2
+		exit 1
+	fi
+
+done
+
 sleep 5
 
 
@@ -218,7 +228,7 @@ sleep 5
 echo -e "\n ========== step 2: filter variants ========== \n"
 
 # stats summary file header
-echo "#SAMPLE,covered_snps,present_snps" > "$stats_csv"
+echo "#SAMPLE,covered_snps,alt_snps" > "$stats_csv"
 
 # loop over samples in sample sheet
 for sample in $(cat "$sample_sheet" | cut -d "," -f 1) ; do
@@ -254,7 +264,7 @@ for sample in $(cat "$sample_sheet" | cut -d "," -f 1) ; do
 
 	# keep table of frequencies for samples with a sufficient number of covered SNPs
 	# cutoff should be relatively high to provide enough overlap across all samples
-	if [ "$present_snps" -lt 1000 ] ; then
+	if [ "$present_snps" -lt 100 ] ; then
 		rm -f "$freq_csv"
 		echo " skip $sample due to insufficient coverage "
 	fi
@@ -262,6 +272,7 @@ for sample in $(cat "$sample_sheet" | cut -d "," -f 1) ; do
 	echo "${sample},${covered_snps},${present_snps}" >> "$stats_csv"
 
 	rm -f "$vcf"
+	rm -f "$filtered_txt"
 
 done
 
