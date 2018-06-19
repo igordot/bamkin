@@ -37,7 +37,7 @@ The `genome.fa` is the reference genome FASTA and should match what the reads in
 The `snps.bed` are the known population SNPs.
 You can additionally specify the output directory (`-o`) and the number of processing threads (`-t`).
 
-Runtime varies greatly depending on the sequencing depth and the distribution of reads, but can be a few minutes per sample for mammalian genomes with 10-50 million reads per sample and 1-5 million known SNPs.
+Runtime will depend on the sequencing depth and the distribution of reads, but can be a few minutes per sample for mammalian genomes with 10-50 million reads per sample and 1-5 million known SNPs.
 
 ## Output
 
@@ -48,8 +48,9 @@ Runtime varies greatly depending on the sequencing depth and the distribution of
 
 ## Retrieving known SNPs
 
-There is a variety resources for known SNPs.
-UCSC hosts tables of reasonably common population SNPs from dbSNP (SNPs that have a minor allele frequency of at least 1% and are mapped to a single location in the reference genome assembly) for many commonly-used genomes.
+There is a variety of resources for known SNPs.
+UCSC Genome Browser is a convenient resources for many commonly-used genomes.
+It provides tables of reasonably common population SNPs (dbSNP SNPs that have a minor allele frequency of at least 1% and are mapped to a single location in the reference genome assembly).
 
 To retrieve the human `hg19` SNPs:
 
