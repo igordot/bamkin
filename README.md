@@ -1,8 +1,8 @@
-# Bamkin: simple SNP-based sample relationship and correlation analysis
+# Bamkin: simple sample correlation and relationship analysis
 
 ## About
 
-Bamkin estimates concordance and similarity within a group of samples.
+Bamkin estimates concordance and similarity within a group of sequenced samples based on SNP frequencies.
 It is designed to be used for checking potential cross-sample contamination in sequencing studies.
 This type of analysis is routinely done in genome-wide association studies (GWAS) and there are many advanced tools available when working in that context, but many experiments are not designed for genotyping.
 Bamkin is a basic genotyping pipeline for a wide range of sequencing-based experiments with varying depth and distribution of coverage, such as RNA-seq or ChIP-seq.
