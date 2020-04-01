@@ -26,7 +26,7 @@ for (p in package_list) {
     message("installing package ", p)
     install.packages(p, quiet = TRUE, repos = "http://cran.rstudio.com")
   }
-  library(p, character.only = TRUE, quietly = TRUE)
+  suppressPackageStartupMessages(library(p, character.only = TRUE))
 }
 
 # limits
@@ -53,7 +53,7 @@ if (num_var_snps < min_snps) stop("too few variable SNPs: ", num_var_snps)
 freq_table = freq_table[rowSds(freq_table) > 0.1, ]
 
 # stop if too few highly variable (present at both high and low frequencies) SNPs
-num_high_var_snps = count((rowMaxs(freq_table) - rowMins(freq_table)) > 0.7)
+num_high_var_snps = count((rowMaxs(freq_table) - rowMins(freq_table)) > 0.4)
 if (num_high_var_snps < min_snps) stop("too few ref/alt SNPs:", num_high_var_snps)
 
 message("rows/SNPs variable: ", nrow(freq_table))
@@ -99,6 +99,7 @@ hclust_plot =
   geom_text(data = label(freq_dendro), aes(x = x, y = y, label = label, hjust = 0), size = font_size) +
   coord_flip() +
   scale_y_reverse(expand = c(0.8, 0)) +
+  theme_cowplot() +
   theme(axis.text = element_blank(), axis.ticks = element_blank(), text = element_blank(), line = element_blank())
 save_plot(filename = "plot.hclust.png", plot = hclust_plot, base_width = 3, base_height = 5, units = "in", dpi = 300)
 
@@ -109,8 +110,11 @@ pca_data = data.frame(PC1 = pca$x[,1], PC2 = pca$x[,2])
 pca_plot =
   ggplot(data = pca_data, aes_string(x = "PC1", y = "PC2")) +
   geom_point(size = 2) +
-  geom_text_repel(aes(label = rownames(pca_data)),
-                  size = font_size, point.padding = unit(0.5, "lines"), color = "black") +
+  geom_text_repel(
+    aes(label = rownames(pca_data)),
+    size = font_size, point.padding = unit(0.5, "lines"), color = "black"
+  ) +
+  theme_cowplot() +
   theme(aspect.ratio = 1, axis.text = element_blank(), axis.ticks = element_blank())
 save_plot(filename = "plot.pca.png", plot = pca_plot, base_width = 5, base_height = 5, units = "in", dpi = 300)
 

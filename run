@@ -98,13 +98,23 @@ fi
 # check software
 
 # check if samtools is in path
+dos2unix_path=$(which dos2unix)
+if [ ! -x "$dos2unix_path" ] ; then
+	echo -e "\n ERROR: dos2unix is not in path \n" >&2
+	exit 1
+fi
+
+dos2unix --version | head -1
+echo
+
+# check if samtools is in path
 samtools_path=$(which samtools)
 if [ ! -x "$samtools_path" ] ; then
 	echo -e "\n ERROR: samtools is not in path \n" >&2
 	exit 1
 fi
 
-samtools --version
+samtools --version | head -1
 echo
 
 # check if bcftools is in path
@@ -114,7 +124,7 @@ if [ ! -x "$bcftools_path" ] ; then
 	exit 1
 fi
 
-bcftools --version
+bcftools --version | head -1
 echo
 
 # check if rscript is in path
@@ -211,10 +221,9 @@ cd "$out_dir" || exit
 # $3 : col2 from $sample_sheet
 
 cat "$sample_sheet" | tr ',' '\n' | xargs -n 2 -P "$threads" bash -c \
-'samtools mpileup \
---uncompressed --max-depth 10000 --min-MQ 20 --ignore-RG --skip-indels \
---fasta-ref "$0" --positions "$1" "$3" \
-| bcftools call --consensus-caller \
+'bcftools mpileup --output-type u --min-MQ 20 --ignore-RG --skip-indels --fasta-ref "$0" --regions-file "$1" "$3" \
+| bcftools call --output-type v --consensus-caller \
+| grep -F -v "DP=0;" \
 > temp.${2}.vcf' "$genome_fasta" "$snps_bed"
 
 sleep 5
@@ -240,11 +249,10 @@ for sample in $(cat "$sample_sheet" | cut -d "," -f 1) ; do
 
 	# filtered txt (VCF filtered by quality)
 	bcftools query \
-	--collapse all \
-	--include '%QUAL>30 && MQ>20 && DP>=5' \
+	--include '%QUAL>30 && MQ>20 && (DP4[0]+DP4[1]+DP4[2]+DP4[3])>=5' \
 	--format '%CHROM:%POS\t%REF\t%FIRST_ALT\t%QUAL\t[%GT]\t%DP4\n' \
 	"$vcf" \
-	| LC_ALL=C sort -k1,1 \
+	| LC_ALL=C sort -u -k1,1 \
 	> "$filtered_txt"
 
 	sleep 1

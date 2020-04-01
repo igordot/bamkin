@@ -19,7 +19,7 @@ Bamkin advantages:
 
 Software dependencies:
 
-- samtools 1.2+
+- samtools 1.9+
 - R 3.3+
 
 Required inputs:
@@ -68,26 +68,33 @@ There is a variety of resources for known SNPs.
 UCSC Genome Browser is a convenient resources for many commonly-used genomes.
 It provides tables of reasonably common population SNPs (dbSNP SNPs that have a minor allele frequency of at least 1% and are mapped to a single location in the reference genome assembly).
 
+To retrieve the human `hg38` SNPs:
+
+```
+wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/snp150Common.txt.gz
+```
+
 To retrieve the human `hg19` SNPs:
 
 ```
-wget ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/snp150Common.txt.gz
+wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/snp150Common.txt.gz
 ```
 
 To retrieve the mouse `mm10` SNPs:
 
 ```
-wget ftp://hgdownload.cse.ucsc.edu/goldenPath/mm10/database/snp142Common.txt.gz
+wget ftp://hgdownload.soe.ucsc.edu/goldenPath/mm10/database/snp142Common.txt.gz
 ```
 
-The table can then be filtered (keeping only point mutations on primary chromosomes with 5% population frequency) and converted to BED format:
+The table can then be filtered to remove less useful variants. This will keep only point mutations on primary chromosomes with 5% population frequency and convert the output to BED format:
 
 ```
-zcat snpXXXCommon.txt.gz \
+gunzip -c snpXXXCommon.txt.gz \
 | grep -F "single" \
 | grep -F "maf-5" \
-| grep -v "random" \
-| grep -v "chrUn" \
+| grep -Fiv "mismatch" \
+| grep -Fv "random" \
+| grep -Fv "chrUn" \
 | cut -f 2,3,4,5 \
 | LC_ALL=C sort -k1,1 -k2,2n \
 > snpXXXCommon.snv.maf5.bed
