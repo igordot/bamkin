@@ -22,7 +22,7 @@ Software dependencies:
 - samtools 1.9+
 - R 3.3+
 
-Required inputs:
+Input files:
 
 - reference genome FASTA file
 - known population SNPs in BED format (see below for instructions on how to generate)
@@ -100,16 +100,19 @@ gunzip -c snpXXXCommon.txt.gz \
 > snpXXXCommon.snv.maf5.bed
 ```
 
-## Alternative methods
+## Alternate methods
 
 Bamkin is a basic tool designed for versatility and simplicity.
 There are a number of methods available for more rigorous analysis:
 
-* [Ancestry and Kinship Tools (AKT)](http://illumina.github.io/akt/)
-* [Conpair](https://github.com/nygenome/Conpair)
-* [GATK CalculateContamination](https://software.broadinstitute.org/gatk/documentation/tooldocs/current/org_broadinstitute_hellbender_tools_walkers_contamination_CalculateContamination.php)
-* [Genome-wide Complex Trait Analysis (GCTA)](http://cnsgenomics.com/software/gcta/#Overview)
-* [peddy](https://github.com/brentp/peddy)
-* [Pedigree Reconstruction and Identification of a Maximum Unrelated Set (PRIMUS)](https://primus.gs.washington.edu/primusweb/res/documentation.html)
-* [verifyBamID](https://genome.sph.umich.edu/wiki/VerifyBamID)
+- [Ancestry and Kinship Tools (AKT)](http://illumina.github.io/akt/)
+- [Conpair](https://github.com/nygenome/Conpair)
+- [GATK CalculateContamination](https://software.broadinstitute.org/gatk/documentation/tooldocs/current/org_broadinstitute_hellbender_tools_walkers_contamination_CalculateContamination.php)
+- [Genome-wide Complex Trait Analysis (GCTA)](http://cnsgenomics.com/software/gcta/#Overview)
+- [HaveYouSwappedYourSamples (NYSYS)](HaveYouSwappedYourSamples)
+- [NGSCheckMate](https://github.com/parklab/NGSCheckMate)
+- [peddy](https://github.com/brentp/peddy)
+- [Pedigree Reconstruction and Identification of a Maximum Unrelated Set (PRIMUS)](https://primus.gs.washington.edu/primusweb/res/documentation.html)
+- [somalier](https://github.com/brentp/somalier)
+- [verifyBamID](https://genome.sph.umich.edu/wiki/VerifyBamID)
 
